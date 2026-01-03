@@ -1,0 +1,57 @@
+# Single-stage Dockerfile for NestJS Backend in a Monorepo (pnpm workspaces)
+# This is a production-ready Dockerfile optimized for Cloud Run
+# Based on working pattern from saloonia project
+#
+# Project Structure:
+#   /app
+#     package.json (root)
+#     pnpm-workspace.yaml
+#     pnpm-lock.yaml
+#     shared/
+#       package.json
+#       src/
+#     api/ (or backend/)
+#       package.json
+#       src/
+#       dist/ (after build)
+#
+# Usage:
+#   - Place this file in your monorepo root as `api/Dockerfile` or `backend/Dockerfile`
+#   - Build from monorepo root: docker build -f api/Dockerfile -t my-api:latest .
+#   - Update SERVICE_NAME in Cloud Build config
+
+FROM node:24-alpine
+
+# Install Python and build dependencies for native modules (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
+
+# Install pnpm
+RUN npm install -g pnpm@8.15.0
+
+WORKDIR /app
+
+# Copy workspace config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy all packages
+COPY shared ./shared
+COPY api ./api
+
+# Install dependencies (including dev dependencies for build)
+RUN pnpm install --frozen-lockfile
+
+# Build shared package first
+RUN cd shared && pnpm build
+
+# Build API
+RUN cd api && pnpm build
+
+# Create uploads directory if needed (adjust path based on your app)
+# RUN mkdir -p /app/api/uploads/photos
+
+# Expose port (Cloud Run will set PORT env var automatically to 8080)
+# The app should read PORT from process.env.PORT
+EXPOSE 8080
+
+# Run from workspace root
+CMD ["node", "api/dist/main.js"]

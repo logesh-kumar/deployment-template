@@ -1,0 +1,73 @@
+# Multi-stage Dockerfile for NestJS Backend (Standalone - No Monorepo)
+# This is a production-ready Dockerfile optimized for Cloud Run
+#
+# Usage:
+#   - Place this file in your NestJS project root as `Dockerfile`
+#   - Update the CMD path if your entry point is different
+#   - Build: docker build -t my-api:latest .
+#   - Run: docker run -p 3000:3000 my-api:latest
+
+# Base stage - Install Node.js and package manager
+FROM node:24-alpine AS base
+
+# Install pnpm (faster and more efficient than npm)
+RUN npm install -g pnpm@8.15.0
+
+# Set working directory
+WORKDIR /app
+
+# Dependencies stage - Install all dependencies
+FROM base AS dependencies
+
+# Copy package files
+COPY package.json pnpm-lock.yaml* ./
+
+# Install dependencies (including dev dependencies for build)
+RUN pnpm install --frozen-lockfile
+
+# Build stage - Build the application
+FROM dependencies AS build
+
+# Copy source code
+COPY . .
+
+# Build the application
+# Adjust the build command based on your package.json scripts
+RUN pnpm build
+
+# Production stage - Minimal runtime image
+FROM node:24-alpine AS production
+
+# Install pnpm
+RUN npm install -g pnpm@8.15.0
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml* ./
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built application from build stage
+COPY --from=build /app/dist ./dist
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001 && \
+    chown -R nestjs:nodejs /app
+
+USER nestjs
+
+# Expose port (Cloud Run will set PORT env var automatically to 8080)
+# Your app should read PORT from process.env.PORT
+EXPOSE 8080
+
+# Health check (optional but recommended)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Start the application
+# Cloud Run sets PORT automatically - your app should use process.env.PORT
+CMD ["node", "dist/main.js"]
+

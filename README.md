@@ -2,6 +2,15 @@
 
 A production-grade, reusable deployment blueprint for Google Cloud Platform (GCP) projects using Cloud Run, Cloud Build, Vertex AI, Google Cloud Storage, and Domain Mapping.
 
+## 🤖 For AI Agents
+
+**If you're an AI assistant implementing this template**, see **[AGENTS.md](./AGENTS.md)** for:
+
+- Prerequisites checklist
+- Questions to ask users
+- Step-by-step implementation guide
+- Common pitfalls to avoid
+
 ## 🎯 Purpose
 
 This blueprint provides a standardized, production-ready infrastructure setup that can be reused across multiple SaaS and AI products. It includes:
@@ -11,7 +20,7 @@ This blueprint provides a standardized, production-ready infrastructure setup th
 - **CI/CD templates** for automated deployments
 - **Infrastructure as Code** (Terraform) for reproducible environments
 - **Secrets management** best practices
-- **Multi-environment support** (dev, staging, prod)
+- **Production-focused** (single prod environment)
 
 ## 📁 Structure
 
@@ -38,8 +47,6 @@ gcp-deployment-blueprint/
 │   ├── variables.tf                   # Variable definitions
 │   ├── outputs.tf                     # Output values
 │   ├── environments/
-│   │   ├── dev.tfvars                 # Dev environment config
-│   │   ├── staging.tfvars             # Staging environment config
 │   │   └── prod.tfvars                # Production environment config
 │   └── README.md                      # Terraform usage guide
 ├── secrets/
@@ -164,13 +171,21 @@ All templates use variables that should be customized per project:
 
 ### Environment Configuration
 
-The blueprint supports multiple environments:
+The blueprint is configured for **production** environment:
 
-- **dev**: Development environment (lower resources, no min instances)
-- **staging**: Staging environment (production-like, for testing)
-- **prod**: Production environment (high availability, scaling)
+- **prod**: Production environment (high availability, scaling, always-on instances)
 
-Configure each environment in `terraform/environments/*.tfvars`.
+Configure in `terraform/environments/prod.tfvars`.
+
+## 🐳 Dockerfile Examples
+
+Production-ready Dockerfiles for NestJS applications are included:
+
+- **`examples/Dockerfile.nestjs-standalone`** - For standalone NestJS apps
+- **`examples/Dockerfile.nestjs-monorepo`** - For NestJS apps in monorepos (pnpm workspaces)
+- **`examples/DOCKERFILE_GUIDE.md`** - Complete guide with customization instructions
+
+See the [Dockerfile Guide](examples/DOCKERFILE_GUIDE.md) for detailed usage and customization.
 
 ## 📚 Documentation
 

@@ -9,7 +9,7 @@
 # Substitutions (set via trigger or command line):
 #   _SERVICE_NAME: Frontend service name (e.g., "my-app")
 #   _REGION: GCP region (e.g., "us-central1")
-#   _ENV: Environment (dev/staging/prod)
+#   _ENV: Environment (prod)
 #   _DOCKERFILE_PATH: Path to Dockerfile (default: "apps/web/Dockerfile" or "packages/frontend/Dockerfile")
 #   _BUILD_CONTEXT: Build context directory (default: ".")
 
@@ -19,12 +19,13 @@ substitutions:
   _ENV: "prod"
   _DOCKERFILE_PATH: "apps/web/Dockerfile"
   _BUILD_CONTEXT: "."
-  _COMMIT_SHA: "${SHORT_SHA}"
+  # Note: Use $BUILD_ID instead of $SHORT_SHA for manual builds
+  # $SHORT_SHA is only available in git-triggered builds
 
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: "E2_HIGHCPU_8"
-  timeout: "1200s" # 20 minutes
+  # Note: timeout removed - not supported in options, use default (10 minutes)
 
 steps:
   # Optional: Run frontend tests before building
@@ -46,7 +47,7 @@ steps:
     args:
       - "build"
       - "-t"
-      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:${_COMMIT_SHA}"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:$BUILD_ID"
       - "-t"
       - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:latest"
       # Build arguments for frontend environment variables
@@ -67,7 +68,7 @@ steps:
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "push"
-      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:${_COMMIT_SHA}"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:$BUILD_ID"
     id: "push-image-sha"
 
   # Push latest tag
@@ -85,7 +86,7 @@ steps:
       - "deploy"
       - "${_SERVICE_NAME}"
       - "--image"
-      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:${_COMMIT_SHA}"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:$BUILD_ID"
       - "--region"
       - "${_REGION}"
       - "--platform"
@@ -102,9 +103,9 @@ steps:
       - "60"
       # Scaling configuration
       - "--min-instances"
-      - '${_ENV == "prod" ? "1" : "0"}'
+      - "1"
       - "--max-instances"
-      - '${_ENV == "prod" ? "50" : "10"}'
+      - "50"
       # Concurrency (how many requests per instance)
       - "--concurrency"
       - "80"
@@ -115,7 +116,7 @@ steps:
 
 # Images to be pushed to Artifact Registry
 images:
-  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:${_COMMIT_SHA}"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:$BUILD_ID"
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/docker-repo/${_SERVICE_NAME}:latest"
 
 tags:

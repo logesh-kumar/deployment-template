@@ -24,6 +24,8 @@ provider "google" {
 }
 
 # Enable required APIs
+# Note: DNS API removed - it's optional and requires billing
+# Error Reporting API removed - it's deprecated
 resource "google_project_service" "required_apis" {
   for_each = toset([
     "cloudbuild.googleapis.com",
@@ -31,12 +33,10 @@ resource "google_project_service" "required_apis" {
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
     "storage.googleapis.com",
-    "dns.googleapis.com",
     "aiplatform.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "cloudtrace.googleapis.com",
-    "errorreporting.googleapis.com",
   ])
 
   service = each.value
@@ -194,7 +194,9 @@ resource "google_cloud_run_v2_service" "backend" {
     service_account = google_service_account.cloud_run_sa.email
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.docker_repo.repository_id}/${var.backend_service_name}:latest"
+      # Placeholder image - will be updated by Cloud Build deployment
+      # Using a minimal image that exists, Cloud Build will replace this
+      image = "gcr.io/cloudrun/hello"
 
       resources {
         limits = {
@@ -213,6 +215,8 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.environment
       }
 
+      # Note: PORT is automatically set by Cloud Run, don't set it manually
+
       # Secrets from Secret Manager
       dynamic "env" {
         for_each = var.backend_secrets
@@ -228,16 +232,17 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       ports {
+        name           = "http1"
         container_port = var.backend_port
       }
     }
 
     scaling {
-      min_instance_count = var.environment == "prod" ? var.backend_min_instances : 0
+      min_instance_count = var.backend_min_instances
       max_instance_count = var.backend_max_instances
     }
 
-    timeout = var.backend_timeout
+    timeout = "${var.backend_timeout}s"
   }
 
   traffic {
@@ -259,7 +264,9 @@ resource "google_cloud_run_v2_service" "frontend" {
     service_account = google_service_account.cloud_run_sa.email
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.docker_repo.repository_id}/${var.frontend_service_name}:latest"
+      # Placeholder image - will be updated by Cloud Build deployment
+      # Using a minimal image that exists, Cloud Build will replace this
+      image = "gcr.io/cloudrun/hello"
 
       resources {
         limits = {
@@ -278,17 +285,20 @@ resource "google_cloud_run_v2_service" "frontend" {
         value = var.environment
       }
 
+      # Note: PORT is automatically set by Cloud Run, don't set it manually
+
       ports {
+        name           = "http1"
         container_port = var.frontend_port
       }
     }
 
     scaling {
-      min_instance_count = var.environment == "prod" ? var.frontend_min_instances : 0
+      min_instance_count = var.frontend_min_instances
       max_instance_count = var.frontend_max_instances
     }
 
-    timeout = var.frontend_timeout
+    timeout = "${var.frontend_timeout}s"
   }
 
   traffic {
@@ -299,6 +309,11 @@ resource "google_cloud_run_v2_service" "frontend" {
   depends_on = [
     google_project_service.required_apis
   ]
+
+  # Ignore image changes - Cloud Build will update the image
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image]
+  }
 }
 
 # IAM: Allow unauthenticated access to Cloud Run services

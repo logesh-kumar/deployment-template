@@ -35,19 +35,34 @@ This directory contains Terraform configurations for provisioning GCP infrastruc
 3. **Terraform GCP Provider**
    - Automatically downloaded on `terraform init`
 
+## Important Notes
+
+### Cloud Run v2 Requirements
+
+- **Timeout format**: Timeout values must be strings with "s" suffix (e.g., `"300s"`). Terraform automatically adds the suffix.
+- **PORT environment variable**: Cloud Run automatically sets PORT - do not set it manually in your configuration.
+- **Placeholder images**: Services are created with placeholder images (`gcr.io/cloudrun/hello`) and updated by Cloud Build deployments.
+- **Image lifecycle**: Terraform ignores image changes so Cloud Build can update images without conflicts.
+
+### API Requirements
+
+- **Billing**: Most APIs require billing to be enabled on your GCP project.
+- **Deprecated APIs**: `errorreporting.googleapis.com` and `dns.googleapis.com` are not included (deprecated/optional).
+
 ## Quick Start
 
 ### 1. Customize Variables
 
-Edit the environment-specific `.tfvars` files:
+Edit the production `.tfvars` file:
 
 ```bash
-# Edit dev environment
-vim terraform/environments/dev.tfvars
+# Edit production environment
+vim terraform/environments/prod.tfvars
 
 # Update:
 # - project_id
 # - backend_secrets (with your secret names)
+# - timeout values (as strings, e.g., "300" for 300 seconds)
 # - domains (if using custom domains)
 ```
 
@@ -61,12 +76,6 @@ terraform init
 ### 3. Plan Changes
 
 ```bash
-# Development
-terraform plan -var-file=environments/dev.tfvars
-
-# Staging
-terraform plan -var-file=environments/staging.tfvars
-
 # Production
 terraform plan -var-file=environments/prod.tfvars
 ```
@@ -74,13 +83,7 @@ terraform plan -var-file=environments/prod.tfvars
 ### 4. Apply Changes
 
 ```bash
-# Development
-terraform apply -var-file=environments/dev.tfvars
-
-# Staging
-terraform apply -var-file=environments/staging.tfvars
-
-# Production (be careful!)
+# Production
 terraform apply -var-file=environments/prod.tfvars
 ```
 
