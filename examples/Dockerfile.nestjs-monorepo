@@ -25,8 +25,10 @@ FROM node:24-alpine
 # Install Python and build dependencies for native modules (bcrypt, etc.)
 RUN apk add --no-cache python3 make g++
 
-# Install pnpm
-RUN npm install -g pnpm@8.15.0
+# Enable pnpm (using corepack - matches saloonia)
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 WORKDIR /app
 
@@ -37,8 +39,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY shared ./shared
 COPY api ./api
 
-# Install dependencies (including dev dependencies for build)
-RUN pnpm install --frozen-lockfile
+# Install dependencies with cache mount (like saloonia)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Build shared package first
 RUN cd shared && pnpm build
@@ -49,9 +52,8 @@ RUN cd api && pnpm build
 # Create uploads directory if needed (adjust path based on your app)
 # RUN mkdir -p /app/api/uploads/photos
 
-# Expose port (Cloud Run will set PORT env var automatically to 8080)
-# The app should read PORT from process.env.PORT
 EXPOSE 8080
 
-# Run from workspace root
-CMD ["node", "api/dist/main.js"]
+# Set working directory to api and use pnpm start:prod for proper module resolution
+WORKDIR /app/api
+CMD ["pnpm", "start:prod"]

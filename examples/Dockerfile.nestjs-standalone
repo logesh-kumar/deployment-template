@@ -10,8 +10,10 @@
 # Base stage - Install Node.js and package manager
 FROM node:24-alpine AS base
 
-# Install pnpm (faster and more efficient than npm)
-RUN npm install -g pnpm@8.15.0
+# Enable pnpm (using corepack - matches saloonia pattern)
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 # Set working directory
 WORKDIR /app
@@ -22,8 +24,9 @@ FROM base AS dependencies
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
-# Install dependencies (including dev dependencies for build)
-RUN pnpm install --frozen-lockfile
+# Install dependencies with cache mount (like saloonia)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Build stage - Build the application
 FROM dependencies AS build
@@ -38,16 +41,19 @@ RUN pnpm build
 # Production stage - Minimal runtime image
 FROM node:24-alpine AS production
 
-# Install pnpm
-RUN npm install -g pnpm@8.15.0
+# Enable pnpm (using corepack)
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 WORKDIR /app
 
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+# Install production dependencies only with cache mount
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod
 
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
@@ -65,7 +71,7 @@ EXPOSE 8080
 
 # Health check (optional but recommended)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 # Cloud Run sets PORT automatically - your app should use process.env.PORT
