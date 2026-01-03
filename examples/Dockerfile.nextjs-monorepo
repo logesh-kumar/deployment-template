@@ -1,0 +1,90 @@
+# Multi-stage Dockerfile for Next.js Frontend in a Monorepo (pnpm workspaces)
+# This is a production-ready Dockerfile optimized for Cloud Run
+# Based on working pattern from saloonia project, adapted for Next.js
+#
+# Project Structure:
+#   /app
+#     package.json (root)
+#     pnpm-workspace.yaml
+#     pnpm-lock.yaml
+#     shared/
+#       package.json
+#       src/
+#     web/ (or frontend/)
+#       package.json
+#       src/
+#       .next/ (after build)
+#
+# Usage:
+#   - Place this file in your monorepo root as `web/Dockerfile` or `frontend/Dockerfile`
+#   - Build from monorepo root: docker build -f web/Dockerfile -t my-web:latest .
+#   - Update SERVICE_NAME in Cloud Build config
+
+FROM node:24-alpine AS builder
+
+# Enable pnpm (using corepack - matches saloonia)
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy workspace config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy packages
+COPY shared ./shared
+COPY web ./web
+
+# Install dependencies with cache mount (like saloonia)
+# IMPORTANT: Use --shamefully-hoist for proper module resolution
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --shamefully-hoist
+
+# Build shared package first
+RUN cd shared && pnpm build
+
+# Build Next.js with production env vars
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+RUN cd web && pnpm build
+
+# Production stage
+FROM node:24-alpine
+
+# Enable pnpm for production stage
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy workspace config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy shared package (needed for runtime)
+COPY shared/package.json ./shared/package.json
+COPY --from=builder /app/shared/dist ./shared/dist
+
+# Copy web package files
+COPY web/package.json ./web/package.json
+COPY web/next.config.js ./web/next.config.js
+
+# Copy built Next.js files
+COPY --from=builder /app/web/.next ./web/.next
+COPY --from=builder /app/web/public ./web/public
+
+# Install production dependencies only
+# IMPORTANT: Use --shamefully-hoist here too for proper module resolution
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod --shamefully-hoist
+
+# Set working directory to web
+WORKDIR /app/web
+
+EXPOSE 8080
+
+# Start Next.js production server
+CMD ["pnpm", "start"]
+

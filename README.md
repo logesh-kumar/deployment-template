@@ -179,11 +179,14 @@ Configure in `terraform/environments/prod.tfvars`.
 
 ## 🐳 Dockerfile Examples
 
-Production-ready Dockerfiles for NestJS applications are included:
+Production-ready Dockerfiles are included:
 
 - **`examples/Dockerfile.nestjs-standalone`** - For standalone NestJS apps
 - **`examples/Dockerfile.nestjs-monorepo`** - For NestJS apps in monorepos (pnpm workspaces)
+- **`examples/Dockerfile.nextjs-monorepo`** - For Next.js apps in monorepos (pnpm workspaces)
 - **`examples/DOCKERFILE_GUIDE.md`** - Complete guide with customization instructions
+
+**Important**: All monorepo Dockerfiles use `--shamefully-hoist` flag for proper module resolution in Docker, even if your `.npmrc` has `shamefully-hoist=false`.
 
 See the [Dockerfile Guide](examples/DOCKERFILE_GUIDE.md) for detailed usage and customization.
 

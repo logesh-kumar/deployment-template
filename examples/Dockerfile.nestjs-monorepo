@@ -1,6 +1,6 @@
 # Single-stage Dockerfile for NestJS Backend in a Monorepo (pnpm workspaces)
 # This is a production-ready Dockerfile optimized for Cloud Run
-# Based on working pattern from saloonia project
+# Based on working pattern from saloonia project and tested in production
 #
 # Project Structure:
 #   /app
@@ -40,8 +40,12 @@ COPY shared ./shared
 COPY api ./api
 
 # Install dependencies with cache mount (like saloonia)
+# IMPORTANT: Use --shamefully-hoist to ensure all dependencies are accessible from root
+# This is REQUIRED for Docker builds when .npmrc has shamefully-hoist=false
+# Without this flag, nested dependencies (like express from @nestjs/platform-express)
+# won't be accessible to Node.js when running from workspace root
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --shamefully-hoist
 
 # Build shared package first
 RUN cd shared && pnpm build
@@ -54,6 +58,7 @@ RUN cd api && pnpm build
 
 EXPOSE 8080
 
-# Set working directory to api and use pnpm start:prod for proper module resolution
-WORKDIR /app/api
-CMD ["pnpm", "start:prod"]
+# Run from workspace root (like saloonia)
+# With --shamefully-hoist, all modules are in /app/node_modules
+# Node.js will resolve modules from workspace root node_modules
+CMD ["node", "api/dist/main.js"]

@@ -35,6 +35,8 @@ docker run -p 3000:3000 my-api:latest
 
 Use this if your NestJS app is in a **monorepo** with shared packages.
 
+**Important**: This Dockerfile uses `--shamefully-hoist` flag to ensure proper module resolution in Docker. This is required even if your `.npmrc` has `shamefully-hoist=false`.
+
 **Project Structure**:
 ```
 my-monorepo/
@@ -60,6 +62,41 @@ docker build -f examples/Dockerfile.nestjs-monorepo -t my-api:latest .
 cp examples/Dockerfile.nestjs-monorepo api/Dockerfile
 docker build -f api/Dockerfile -t my-api:latest .
 ```
+
+### 3. Monorepo Next.js Application (pnpm workspaces)
+**File**: `examples/Dockerfile.nextjs-monorepo`
+
+Use this if your Next.js app is in a **monorepo** with shared packages.
+
+**Project Structure**:
+```
+my-monorepo/
+  package.json (root)
+  pnpm-workspace.yaml
+  pnpm-lock.yaml
+  shared/
+    package.json
+    src/
+    dist/ (after build)
+  web/ (or frontend/)
+    package.json
+    src/
+    .next/ (after build)
+```
+
+**Usage**:
+```bash
+# Build from monorepo root
+docker build -f examples/Dockerfile.nextjs-monorepo -t my-web:latest \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com/api .
+
+# Or copy to your project
+cp examples/Dockerfile.nextjs-monorepo web/Dockerfile
+docker build -f web/Dockerfile -t my-web:latest \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com/api .
+```
+
+**Important**: This Dockerfile uses `--shamefully-hoist` flag in both build and production stages to ensure proper module resolution in Docker.
 
 ## 🔧 Customization
 
@@ -114,6 +151,18 @@ ENV NODE_ENV=${NODE_ENV}
 For runtime variables, use Cloud Run's `--set-env-vars` or Secret Manager.
 
 ## ⚠️ Important Notes
+
+### pnpm Workspace Module Resolution
+
+**CRITICAL**: If your project uses pnpm workspaces with `shamefully-hoist=false` in `.npmrc`, you **MUST** use the `--shamefully-hoist` flag in your Dockerfile:
+
+```dockerfile
+RUN pnpm install --frozen-lockfile --shamefully-hoist
+```
+
+**Why?** Without this flag, nested dependencies (like `express` from `@nestjs/platform-express`) won't be hoisted to the root `node_modules`, causing "Cannot find module" errors when running from workspace root.
+
+This flag only affects the Docker build and doesn't change your local development setup.
 
 ### PORT Environment Variable
 
@@ -209,6 +258,8 @@ Before deploying, ensure:
 - Ensure shared package is built before API package
 - Verify `pnpm-workspace.yaml` is correct
 - Check that all workspace packages are copied
+- **If you get "Cannot find module" errors**: Add `--shamefully-hoist` to `pnpm install` command
+- **If modules aren't found at runtime**: Ensure you're running from workspace root (`CMD ["node", "api/dist/main.js"]` from `/app`)
 
 ## 📚 Additional Resources
 
