@@ -1,0 +1,107 @@
+# Example Project Configuration
+# Use this as a template when setting up a new project
+# Copy and customize for your specific project
+
+project:
+  id: "your-project-id"
+  name: "Your Project Name"
+  region: "us-central1" # or asia-south1, europe-west1, etc.
+  environments:
+    - dev
+    - staging
+    - prod
+
+services:
+  frontend:
+    name: "frontend"
+    dockerfile_path: "apps/web/Dockerfile"
+    build_context: "."
+    cpu: "1"
+    memory: "512Mi"
+    min_instances:
+      dev: 0
+      staging: 1
+      prod: 1
+    max_instances:
+      dev: 5
+      staging: 20
+      prod: 50
+    timeout: "60"
+    port: 8080
+    domain:
+      dev: ""
+      staging: "staging.example.com"
+      prod: "app.example.com"
+
+  backend:
+    name: "backend"
+    dockerfile_path: "apps/api/Dockerfile"
+    build_context: "."
+    cpu: "1"
+    memory: "1Gi"
+    min_instances:
+      dev: 0
+      staging: 1
+      prod: 1
+    max_instances:
+      dev: 5
+      staging: 20
+      prod: 100
+    timeout: "300"
+    port: 8080
+    domain:
+      dev: ""
+      staging: "api-staging.example.com"
+      prod: "api.example.com"
+    secrets:
+      - DATABASE_URL=database-url:latest
+      - JWT_SECRET=jwt-secret:latest
+      - API_KEY=api-key:latest
+
+storage:
+  buckets:
+    - name: "uploads"
+      purpose: "User uploads"
+      storage_class: "STANDARD"
+      lifecycle_days: 365
+    - name: "media"
+      purpose: "Media files (images, videos)"
+      storage_class: "STANDARD"
+      lifecycle_days: 365
+    - name: "static"
+      purpose: "Static assets"
+      storage_class: "STANDARD"
+      public: true
+    - name: "backups"
+      purpose: "Database backups"
+      storage_class: "NEARLINE"
+      lifecycle_days: 90
+
+artifact_registry:
+  repository: "docker-repo"
+  location: "us-central1"
+
+github:
+  owner: "your-org"
+  repo: "your-repo"
+  branch_patterns:
+    dev: "^dev$"
+    staging: "^staging$"
+    prod: "^main$"
+
+secrets:
+  # List of secrets to create in Secret Manager
+  # Format: secret-name: description
+  database-url: "PostgreSQL connection string"
+  jwt-secret: "JWT signing secret"
+  api-key: "Third-party API key"
+  stripe-secret-key: "Stripe API secret key"
+  smtp-password: "SMTP password"
+# Customization Notes:
+# 1. Update project.id with your GCP project ID
+# 2. Update service names to match your application
+# 3. Adjust resource limits based on your needs
+# 4. Configure domains if using custom domains
+# 5. Add/remove secrets based on your requirements
+# 6. Update GitHub configuration for CI/CD triggers
+

@@ -1,0 +1,20 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars.backup
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Environment-specific files (optional - you may want to commit .tfvars)
+# Uncomment if you don't want to commit tfvars files
+# *.tfvars
+# !environments/*.tfvars.example
+
